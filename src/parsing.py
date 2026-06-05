@@ -26,6 +26,12 @@ def _f(v):
         return None
 
 
+def _f0(v):
+    """float со значением по умолчанию 0.0 (None трактуется как 0.0)."""
+    f = _f(v)
+    return f if f is not None else 0.0
+
+
 def _i(v):
     f = _f(v)
     return int(f) if f is not None else None
@@ -72,8 +78,8 @@ def parse_workbook(path):
                 date_start=_s(g(row, "Дата начала статуса")),
                 date_end=_s(g(row, "Дата окончания статуса")),
                 month=_i(g(row, "Месяц начала текущего статуса")),
-                duration_rd=_f(g(row, "Длительность, р.д.")) or 0.0,
-                work_duration_rd=_f(g(row, "Длительность проработки запроса (раб. дн.)")) or 0.0,
+                duration_rd=_f0(g(row, "Длительность, р.д.")),
+                work_duration_rd=_f0(g(row, "Длительность проработки запроса (раб. дн.)")),
                 hours=_f(g(row, "Отработано часов")),
                 note=_s(g(row, "Примечание")),
             ))
