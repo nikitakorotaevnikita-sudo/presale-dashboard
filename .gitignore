@@ -5,3 +5,4 @@ data/
 tmp/
 .superpowers/
 .env
+*.egg-info/
