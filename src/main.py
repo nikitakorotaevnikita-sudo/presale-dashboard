@@ -1,9 +1,12 @@
 import tempfile
+import zipfile
+from contextlib import closing
 from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
+from openpyxl.utils.exceptions import InvalidFileException
 
 from src import config, storage, metrics, export
 from src.parsing import parse_workbook, ParseError
@@ -45,28 +48,32 @@ def health():
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...), uploaded_by: str = Form("")):
     suffix = Path(file.filename or "f.xlsx").suffix or ".xlsx"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
+    tmp_path = None
     try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
         events = parse_workbook(tmp_path)
-    except Exception as exc:
+    except (ParseError, InvalidFileException, zipfile.BadZipFile) as exc:
         raise HTTPException(status_code=400, detail=f"Не удалось прочитать файл: {exc}")
     finally:
-        Path(tmp_path).unlink(missing_ok=True)
-    conn = _conn()
-    storage.replace_events(conn, events, file.filename or "", uploaded_by)
-    return {"row_count": len(events), "upload": storage.last_upload(conn)}
+        if tmp_path:
+            Path(tmp_path).unlink(missing_ok=True)
+    with closing(_conn()) as conn:
+        storage.replace_events(conn, events, file.filename or "", uploaded_by)
+        return {"row_count": len(events), "upload": storage.last_upload(conn)}
 
 
 @app.get("/api/status")
 def status():
-    return {"upload": storage.last_upload(_conn())}
+    with closing(_conn()) as conn:
+        return {"upload": storage.last_upload(conn)}
 
 
 @app.get("/api/filters")
 def filters():
-    return storage.distinct_values(_conn())
+    with closing(_conn()) as conn:
+        return storage.distinct_values(conn)
 
 
 @app.get("/api/metrics")
@@ -75,9 +82,9 @@ def get_metrics(metric: str, dimension: str,
                 teams: str = "", initiators: str = ""):
     if metric not in metrics.METRICS:
         raise HTTPException(400, f"Неизвестный показатель: {metric}")
-    conn = _conn()
-    events = _events_filtered(conn, _filters_from_query(
-        services, products, scales, teams, initiators))
+    with closing(_conn()) as conn:
+        events = _events_filtered(conn, _filters_from_query(
+            services, products, scales, teams, initiators))
     return metrics.build_matrix(events, metric, dimension)
 
 
@@ -85,9 +92,9 @@ def get_metrics(metric: str, dimension: str,
 def get_requests(metric: str, dimension: str, value: str, month: int,
                  services: str = "", products: str = "", scales: str = "",
                  teams: str = "", initiators: str = ""):
-    conn = _conn()
-    events = _events_filtered(conn, _filters_from_query(
-        services, products, scales, teams, initiators))
+    with closing(_conn()) as conn:
+        events = _events_filtered(conn, _filters_from_query(
+            services, products, scales, teams, initiators))
     return metrics.drilldown(events, metric, dimension, value, month)
 
 
@@ -95,9 +102,9 @@ def get_requests(metric: str, dimension: str, value: str, month: int,
 def get_export(dimension: str = "услуга",
                services: str = "", products: str = "", scales: str = "",
                teams: str = "", initiators: str = ""):
-    conn = _conn()
-    events = _events_filtered(conn, _filters_from_query(
-        services, products, scales, teams, initiators))
+    with closing(_conn()) as conn:
+        events = _events_filtered(conn, _filters_from_query(
+            services, products, scales, teams, initiators))
     data = export.build_export(events, dimension=dimension)
     return Response(
         content=data,

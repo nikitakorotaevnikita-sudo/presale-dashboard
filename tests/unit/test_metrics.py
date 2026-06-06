@@ -79,3 +79,14 @@ def test_build_matrix_shape():
     assert m["months"] == [1, 2, 3]
     assert m["values"]["A"][1] == 1
     assert m["values"]["A"][3] is None
+
+
+def test_drilldown_includes_value_field():
+    events = [
+        ev("1", "Принято", 4, service="A", hours=10.0),
+        ev("2", "Инициализация", 1, service="A"),
+    ]
+    acc = metrics.drilldown(events, "трудоемкость", "услуга", "A", 4)
+    assert acc and acc[0]["value"] == 10.0
+    init = metrics.drilldown(events, "поступило", "услуга", "A", 1)
+    assert init and init[0]["value"] == 1

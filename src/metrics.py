@@ -93,11 +93,11 @@ def compute_cells(events, metric, dim):
 
 def build_matrix(events, metric, dim, months=range(1, 13)):
     cells = compute_cells(events, metric, dim)
-    months = list(months)
+    month_list = list(months)
     rows = sorted({k[0] for k in cells})
-    values = {rv: {m: cells.get((rv, m)) for m in months} for rv in rows}
+    values = {rv: {m: cells.get((rv, m)) for m in month_list} for rv in rows}
     return {"metric": metric, "dimension": dim, "rows": rows,
-            "months": months, "values": values}
+            "months": month_list, "values": values}
 
 
 def drilldown(events, metric, dim, value, month):
@@ -119,6 +119,7 @@ def drilldown(events, metric, dim, value, month):
         item = {"request_id": rid, "request": e.request, "org": e.org,
                 "service": e.service, "team": e.team, "status": e.status,
                 "date_start": e.date_start}
+        item["value"] = 1  # по умолчанию: каждый запрос считается за 1 (поступило/проработано)
         if metric == "трудоемкость":
             item["value"] = e.hours
         elif metric == "длительность":

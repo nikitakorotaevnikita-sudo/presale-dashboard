@@ -57,9 +57,13 @@ def last_upload(conn):
     return dict(row) if row else None
 
 
+ALLOWED_ATTRS = set(DIMENSION_ATTR.values())
+
+
 def distinct_values(conn):
     out = {}
     for dim, attr in DIMENSION_ATTR.items():
+        assert attr in ALLOWED_ATTRS  # имена колонок только из кода, не из ввода
         cur = conn.execute(
             f"SELECT DISTINCT {attr} FROM status_events "
             f"WHERE {attr} != '' ORDER BY {attr}")

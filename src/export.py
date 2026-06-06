@@ -28,4 +28,5 @@ def build_export(events, dimension="услуга", months=range(1, 13)):
             ws.append(row)
     buf = io.BytesIO()
     wb.save(buf)
+    wb.close()
     return buf.getvalue()
