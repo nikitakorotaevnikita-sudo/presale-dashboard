@@ -31,7 +31,7 @@ body {
   background: var(--card);
   border-bottom: 1px solid var(--border);
 }
-.topbar__title { margin: 0; font-size: 20px; font-weight: 650; color: var(--accent); }
+.topbar__title { margin: 0; font-size: 20px; font-weight: 600; color: var(--accent); }
 .topbar__status { margin-top: 4px; font-size: 12px; color: var(--muted); }
 .topbar__actions { display: flex; gap: 8px; flex-shrink: 0; }
 
@@ -75,7 +75,7 @@ body {
   box-shadow: var(--shadow);
 }
 .kpi__label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-.kpi__value { font-size: 24px; font-weight: 650; color: var(--accent); }
+.kpi__value { font-size: 24px; font-weight: 600; color: var(--accent); }
 
 .filters {
   display: flex;
@@ -193,7 +193,7 @@ table { border-collapse: collapse; width: 100%; font-size: 13px; }
 #matrix th, #matrix td { border: 1px solid var(--border); padding: 6px 10px; text-align: right; }
 #matrix th:first-child, #matrix td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
 #matrix thead th { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-#matrix tr.total-row td { font-weight: 650; background: #fafbfc; }
+#matrix tr.total-row td { font-weight: 600; background: #fafbfc; }
 #matrix td.cell--clickable { cursor: pointer; }
 #matrix td.cell--clickable:hover { background: var(--accent-soft); }
 

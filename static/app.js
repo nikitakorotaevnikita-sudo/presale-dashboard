@@ -37,6 +37,7 @@ const state = {
   matrix: null,
 };
 let chart = null;
+let matrixGen = 0;
 
 // ---- fetch-хелперы ----
 async function api(path, params) {
@@ -115,27 +116,36 @@ async function loadStatus() {
 
 // ---- загрузка файла ----
 async function uploadFile(file) {
+  const btn = document.getElementById("upload-btn");
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.textContent = "Загрузка…";
   const fd = new FormData();
   fd.append("file", file);
   fd.append("uploaded_by", "Веб-интерфейс");
-  let r;
   try {
-    r = await fetch("/api/upload", { method: "POST", body: fd });
-  } catch (e) {
-    showToast("Сетевая ошибка при загрузке: " + e.message, true);
-    return;
+    let r;
+    try {
+      r = await fetch("/api/upload", { method: "POST", body: fd });
+    } catch (e) {
+      showToast("Сетевая ошибка при загрузке: " + e.message, true);
+      return;
+    }
+    if (!r.ok) {
+      let detail = `Ошибка ${r.status}`;
+      try { const b = await r.json(); if (b.detail) detail = b.detail; } catch (_) {}
+      showToast(detail, true);
+      return;
+    }
+    const body = await r.json();
+    showToast(`Файл загружен: ${body.row_count} строк`);
+    await loadStatus();
+    await loadFilters();
+    await refreshAll();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
   }
-  if (!r.ok) {
-    let detail = `Ошибка ${r.status}`;
-    try { const b = await r.json(); if (b.detail) detail = b.detail; } catch (_) {}
-    showToast(detail, true);
-    return;
-  }
-  const body = await r.json();
-  showToast(`Файл загружен: ${body.row_count} строк`);
-  await loadStatus();
-  await loadFilters();
-  await refreshAll();
 }
 
 // ---- KPI ----
@@ -283,10 +293,14 @@ function renderDims() {
 
 // ---- данные матрицы ----
 async function reloadMatrix() {
+  const gen = ++matrixGen;
   try {
-    state.matrix = await api("/api/metrics",
+    const result = await api("/api/metrics",
       Object.assign({ metric: state.metric, dimension: state.dimension }, apiFilterParams()));
+    if (gen !== matrixGen) return; // более новый запрос уже выполняется — игнорируем устаревший ответ
+    state.matrix = result;
   } catch (e) {
+    if (gen !== matrixGen) return;
     state.matrix = null;
     document.getElementById("matrix").innerHTML =
       `<tbody><tr><td class="empty">Не удалось загрузить данные: ${e.message}</td></tr></tbody>`;
@@ -304,7 +318,9 @@ function cellVal(rowName, month) {
   return v === undefined ? null : v;
 }
 
-// «ВСЕГО» по месяцу: для count — сумма, для avg — среднее непустых
+// «ВСЕГО» по месяцу: для count — сумма, для avg — среднее непустых.
+// Примечание: для средних показателей строка ВСЕГО — это среднее из средних по строкам
+// (приближение); точное среднее по всем наблюдениям см. в карточках KPI.
 function totalForMonth(month) {
   const m = state.matrix;
   if (!m) return null;
@@ -468,6 +484,10 @@ function exportExcel() {
   url.searchParams.set("dimension", state.dimension);
   const p = apiFilterParams();
   for (const [k, v] of Object.entries(p)) if (v) url.searchParams.set(k, v);
+  const selMonths = state.filters["месяц"];
+  if (selMonths.size > 0) {
+    url.searchParams.set("months", Array.from(selMonths).map(Number).sort((a, b) => a - b).join(","));
+  }
   window.location.href = url.toString();
 }
 

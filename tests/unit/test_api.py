@@ -78,3 +78,16 @@ def test_export_endpoint(tmp_path, monkeypatch):
     assert r.status_code == 200
     assert r.headers["content-type"].startswith(
         "application/vnd.openxmlformats")
+
+
+def test_export_respects_month_filter(tmp_path, monkeypatch):
+    client = make_client(tmp_path, monkeypatch)
+    upload_fixture(client)
+    import io, openpyxl
+    r = client.get("/api/export", params={"dimension": "услуга", "months": "1,2"})
+    assert r.status_code == 200
+    wb = openpyxl.load_workbook(io.BytesIO(r.content))
+    ws = wb["Поступило"]
+    header = [c.value for c in ws[1]]
+    # после заголовка-подписи только месяцы 1 и 2
+    assert header[1:] == [1, 2]

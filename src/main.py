@@ -108,13 +108,14 @@ def get_summary(services: str = "", products: str = "", scales: str = "",
 
 
 @app.get("/api/export")
-def get_export(dimension: str = "услуга",
+def get_export(dimension: str = "услуга", months: str = "",
                services: str = "", products: str = "", scales: str = "",
                teams: str = "", initiators: str = ""):
+    month_list = sorted([int(x) for x in months.split(",") if x.strip()]) if months else list(range(1, 13))
     with closing(_conn()) as conn:
         events = _events_filtered(conn, _filters_from_query(
             services, products, scales, teams, initiators))
-    data = export.build_export(events, dimension=dimension)
+    data = export.build_export(events, dimension=dimension, months=month_list)
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
