@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Пресейл ОГВ — дашборд</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__left">
+      <h1 class="topbar__title">Пресейл ОГВ — дашборд</h1>
+      <div id="status-line" class="topbar__status">Загрузка…</div>
+    </div>
+    <div class="topbar__actions">
+      <input type="file" id="file-input" accept=".xlsx" hidden>
+      <button id="upload-btn" class="btn">⬆ Загрузить файл</button>
+      <button id="export-btn" class="btn">⬇ Выгрузить Excel</button>
+    </div>
+  </header>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <section id="kpi" class="kpi"></section>
+
+  <section class="filters" id="filters">
+    <div class="filters__row" id="filters-row"></div>
+    <button id="reset-btn" class="btn btn--ghost">Сбросить</button>
+  </section>
+
+  <nav class="tabs" id="tabs"></nav>
+
+  <section class="dims" id="dims"></section>
+
+  <section class="content">
+    <div class="card chart-card">
+      <canvas id="chart"></canvas>
+    </div>
+    <div class="card table-card">
+      <div class="table-wrap">
+        <table id="matrix"></table>
+      </div>
+    </div>
+  </section>
+
+  <div id="drill-overlay" class="overlay" hidden>
+    <aside class="panel" id="drill-panel">
+      <div class="panel__head">
+        <h2 id="drill-title">Запросы</h2>
+        <button id="drill-close" class="btn btn--ghost">✕</button>
+      </div>
+      <div class="panel__body">
+        <table id="drill-table"></table>
+      </div>
+    </aside>
+  </div>
+
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -100,6 +100,30 @@ def build_matrix(events, metric, dim, months=range(1, 13)):
             "months": month_list, "values": values}
 
 
+def summary(events):
+    """Корректные итоги/средние по всем отфильтрованным событиям (для KPI)."""
+    init = {e.request_id for e in events if e.status == STATUS_INIT}
+    accepted = {e.request_id for e in events if e.status == STATUS_ACCEPTED}
+    hours = {}
+    work = defaultdict(float)
+    control = defaultdict(float)
+    for e in events:
+        work[e.request_id] += e.work_duration_rd
+        if e.status == STATUS_ON_CONTROL:
+            control[e.request_id] += e.duration_rd
+        if e.status == STATUS_ACCEPTED and e.hours is not None:
+            hours[e.request_id] = e.hours
+    acc_work = [work[r] for r in accepted]
+    acc_control = [control[r] for r in accepted]
+    return {
+        "поступило": len(init),
+        "проработано": len(accepted),
+        "трудоемкость": round(mean(hours.values()), 1) if hours else None,
+        "длительность": round(mean(acc_work), 1) if acc_work else None,
+        "на_контроле": round(mean(acc_control), 1) if acc_control else None,
+    }
+
+
 def drilldown(events, metric, dim, value, month):
     """Список запросов за конкретной ячейкой (число/среднее)."""
     attr = _attr(dim)

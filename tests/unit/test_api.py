@@ -61,6 +61,16 @@ def test_drilldown_endpoint(tmp_path, monkeypatch):
     assert len(r.json()) == 5
 
 
+def test_summary_endpoint(tmp_path, monkeypatch):
+    client = make_client(tmp_path, monkeypatch)
+    upload_fixture(client)
+    r = client.get("/api/summary")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["поступило"] == 44  # все поступившие за период в фикстуре
+    assert set(body) == {"поступило", "проработано", "трудоемкость", "длительность", "на_контроле"}
+
+
 def test_export_endpoint(tmp_path, monkeypatch):
     client = make_client(tmp_path, monkeypatch)
     upload_fixture(client)

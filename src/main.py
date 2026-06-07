@@ -98,6 +98,15 @@ def get_requests(metric: str, dimension: str, value: str, month: int,
     return metrics.drilldown(events, metric, dimension, value, month)
 
 
+@app.get("/api/summary")
+def get_summary(services: str = "", products: str = "", scales: str = "",
+                teams: str = "", initiators: str = ""):
+    with closing(_conn()) as conn:
+        events = _events_filtered(conn, _filters_from_query(
+            services, products, scales, teams, initiators))
+    return metrics.summary(events)
+
+
 @app.get("/api/export")
 def get_export(dimension: str = "услуга",
                services: str = "", products: str = "", scales: str = "",
