@@ -21,6 +21,26 @@ def _conn():
     return conn
 
 
+def _fix_form_encoding(value: str) -> str:
+    """Чинит кириллицу из не-UTF-8 полей multipart-формы.
+
+    Starlette при ошибке UTF-8-декода текстового поля формы молча откатывается
+    на latin-1. Windows-клиенты (curl/PowerShell) шлют кириллицу в cp1251 —
+    получается мозаика («Тест» -> «Òåñò»). Корректно декодированная UTF-8
+    кириллица содержит кодпоинты > U+00FF, поэтому .encode("latin-1") для неё
+    падает — такие строки оставляем как есть. Чиним только артефакты
+    latin-1-фоллбэка (все символы ≤ U+00FF), пере-декодируя их как cp1251.
+    """
+    try:
+        raw = value.encode("latin-1")
+    except UnicodeEncodeError:
+        return value  # уже корректная UTF-8 строка (символы вне latin-1)
+    try:
+        return raw.decode("cp1251")
+    except UnicodeDecodeError:
+        return value
+
+
 def _list_param(value):
     return [v for v in value.split(",") if v] if value else None
 
@@ -59,8 +79,10 @@ async def upload(file: UploadFile = File(...), uploaded_by: str = Form("")):
     finally:
         if tmp_path:
             Path(tmp_path).unlink(missing_ok=True)
+    uploaded_by = _fix_form_encoding(uploaded_by)
+    filename = _fix_form_encoding(file.filename or "")
     with closing(_conn()) as conn:
-        storage.replace_events(conn, events, file.filename or "", uploaded_by)
+        storage.replace_events(conn, events, filename, uploaded_by)
         return {"row_count": len(events), "upload": storage.last_upload(conn)}
 
 

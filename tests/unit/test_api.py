@@ -2,6 +2,27 @@ from pathlib import Path
 import importlib
 from fastapi.testclient import TestClient
 
+from src.main import _fix_form_encoding
+
+
+def test_fix_form_encoding_repairs_cp1251_mojibake():
+    # Starlette декодирует не-UTF-8 поле формы через latin-1 fallback:
+    # cp1251-байты «Тест» (d2 e5 f1 f2) -> строка «Òåñò».
+    mojibake = b"\xd2\xe5\xf1\xf2".decode("latin-1")
+    assert mojibake == "Òåñò"
+    assert _fix_form_encoding(mojibake) == "Тест"
+
+
+def test_fix_form_encoding_leaves_valid_utf8_cyrillic():
+    # Корректная UTF-8 кириллица (кодпоинты > U+00FF) не трогается.
+    assert _fix_form_encoding("Веб-интерфейс") == "Веб-интерфейс"
+    assert _fix_form_encoding("Тест") == "Тест"
+
+
+def test_fix_form_encoding_leaves_ascii_and_empty():
+    assert _fix_form_encoding("statistika_source_v14.xlsx") == "statistika_source_v14.xlsx"
+    assert _fix_form_encoding("") == ""
+
 
 def make_client(tmp_path, monkeypatch):
     monkeypatch.setenv("PRESALE_DB", str(tmp_path / "api.db"))
