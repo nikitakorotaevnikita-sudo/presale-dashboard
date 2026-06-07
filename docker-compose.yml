@@ -1,0 +1,10 @@
+services:
+  presale-dashboard:
+    build: .
+    environment:
+      - PRESALE_DB=/app/data/presale.db
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

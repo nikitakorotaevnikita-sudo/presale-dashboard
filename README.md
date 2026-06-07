@@ -43,6 +43,33 @@ launch.bat
 
 ---
 
+## Запуск в Docker
+
+Образ работает офлайн (Chart.js вшит локально, без CDN). База SQLite хранится в томе `./data` и переживает пересоздание контейнера.
+
+```bash
+docker compose up --build -d
+```
+
+Открыть: **http://localhost:8090/**
+
+Остановить:
+
+```bash
+docker compose down
+```
+
+Без compose:
+
+```bash
+docker build -t presale-dashboard .
+docker run -d -p 8090:8090 -v "$(pwd)/data:/app/data" presale-dashboard
+```
+
+Путь к БД внутри контейнера задаётся переменной `PRESALE_DB` (по умолчанию `/app/data/presale.db`).
+
+---
+
 ## Использование
 
 1. Нажать **«Загрузить файл»** и выбрать xlsx-выгрузку «Статистика по выполненным работам».
