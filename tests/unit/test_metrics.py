@@ -90,3 +90,46 @@ def test_drilldown_includes_value_field():
     assert acc and acc[0]["value"] == 10.0
     init = metrics.drilldown(events, "поступило", "услуга", "A", 1)
     assert init and init[0]["value"] == 1
+
+
+def test_month_totals_avg_over_all_requests():
+    # услуга A: 2 запроса (10, 20); услуга B: 1 запрос (60)
+    events = [
+        ev("1", "Принято", 4, service="A", hours=10.0),
+        ev("2", "Принято", 4, service="A", hours=20.0),
+        ev("3", "Принято", 4, service="B", hours=60.0),
+    ]
+    # среднее из средних по разрезам = (15 + 60)/2 = 37.5 — НЕВЕРНО
+    # честное среднее по всем запросам = (10+20+60)/3 = 30
+    totals = metrics.month_totals(events, "трудоемкость")
+    assert totals[4] == 30.0
+
+
+def test_build_matrix_totals_over_all_requests():
+    events = [
+        ev("1", "Принято", 4, service="A", hours=10.0),
+        ev("2", "Принято", 4, service="B", hours=20.0),
+    ]
+    m = metrics.build_matrix(events, "трудоемкость", "услуга", months=[4])
+    assert m["totals"][4] == 15.0  # (10+20)/2 по всем запросам
+
+
+def test_duration_rounds_up_to_integer():
+    events = [
+        ev("1", "Инициализация", 5, service="A", work=3.0),
+        ev("1", "В работе", 5, service="A", work=7.1),  # сумма 10.1
+        ev("1", "Принято", 5, service="A"),
+    ]
+    m = metrics.build_matrix(events, "длительность", "услуга", months=[5])
+    assert m["values"]["A"][5] == 11   # ceil(10.1)
+    assert m["totals"][5] == 11
+
+
+def test_summary_duration_rounds_up():
+    events = [
+        ev("1", "Инициализация", 5, service="A", work=3.0),
+        ev("1", "В работе", 5, service="A", work=7.1),
+        ev("1", "Принято", 5, service="A"),
+    ]
+    s = metrics.summary(events)
+    assert s["длительность"] == 11

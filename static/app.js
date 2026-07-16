@@ -68,19 +68,49 @@ function apiFilterParams() {
   };
 }
 
-// видимые месяцы (фильтр месяца применяется на клиенте)
+// последний месяц с данными (по totals; подстраховка по ячейкам)
+function lastDataMonth() {
+  const m = state.matrix;
+  if (!m) return null;
+  let last = 0;
+  if (m.totals) {
+    for (const mm of m.months) {
+      const v = m.totals[String(mm)];
+      if (v !== null && v !== undefined) last = Math.max(last, mm);
+    }
+  }
+  for (const r of m.rows) {
+    for (const mm of m.months) {
+      const v = cellVal(r, mm);
+      if (v !== null && v !== undefined) last = Math.max(last, mm);
+    }
+  }
+  return last || null;
+}
+
+// видимые месяцы: фильтр месяца — на клиенте; без фильтра годовой вид
+// обрезается по последний месяц актуализации (не показываем пустые будущие месяцы)
 function visibleMonths() {
   const all = state.matrix ? state.matrix.months : Array.from({ length: 12 }, (_, i) => i + 1);
   const sel = state.filters["месяц"];
-  if (sel.size === 0) return all;
-  return all.filter((m) => sel.has(String(m)));
+  if (sel.size > 0) return all.filter((m) => sel.has(String(m)));
+  const last = lastDataMonth();
+  return last ? all.filter((m) => m <= last) : all;
 }
 
 function fmtCount(v) { return v === null || v === undefined ? "" : String(Math.round(v)); }
 function fmtAvg(v) { return v === null || v === undefined ? "" : Number(v).toFixed(1); }
-function fmtKpi(v, kind) {
+// «Ср. длительность» показываем целым (значения уже округлены вверх на бэкенде)
+function metricFmt(metricKey) {
+  const m = METRICS.find((x) => x.key === metricKey);
+  const kind = m ? m.kind : "count";
+  if (kind === "count" || metricKey === "длительность") return fmtCount;
+  return fmtAvg;
+}
+function fmtKpi(v, kind, key) {
   if (v === null || v === undefined) return "—";
-  return kind === "count" ? String(Math.round(v)) : Number(v).toFixed(1);
+  if (kind === "count" || key === "длительность") return String(Math.round(v));
+  return Number(v).toFixed(1);
 }
 function currentKind() {
   const m = METRICS.find((x) => x.key === state.metric);
@@ -156,7 +186,7 @@ async function renderKpi() {
   catch (e) { el.innerHTML = `<div class="empty">KPI недоступны: ${e.message}</div>`; return; }
   el.innerHTML = KPI_CARDS.map((c) =>
     `<div class="kpi__card"><div class="kpi__label">${c.label}</div>` +
-    `<div class="kpi__value">${fmtKpi(s[c.key], c.kind)}</div></div>`).join("");
+    `<div class="kpi__value">${fmtKpi(s[c.key], c.kind, c.key)}</div></div>`).join("");
 }
 
 // ---- фильтры ----
@@ -318,16 +348,13 @@ function cellVal(rowName, month) {
   return v === undefined ? null : v;
 }
 
-// «ВСЕГО» по месяцу: для count — сумма, для avg — среднее непустых.
-// Примечание: для средних показателей строка ВСЕГО — это среднее из средних по строкам
-// (приближение); точное среднее по всем наблюдениям см. в карточках KPI.
+// «ВСЕГО» по месяцу берём с бэкенда (totals): для count — количество запросов,
+// для средних — честное среднее ПО ВСЕМ запросам месяца, а не среднее из средних по разрезам.
 function totalForMonth(month) {
   const m = state.matrix;
-  if (!m) return null;
-  const vals = m.rows.map((r) => cellVal(r, month)).filter((v) => v !== null && v !== undefined);
-  if (!vals.length) return null;
-  if (currentKind() === "count") return vals.reduce((a, b) => a + b, 0);
-  return vals.reduce((a, b) => a + b, 0) / vals.length;
+  if (!m || !m.totals) return null;
+  const v = m.totals[String(month)];
+  return v === undefined ? null : v;
 }
 
 // ---- таблица ----
@@ -335,8 +362,7 @@ function renderTable() {
   const table = document.getElementById("matrix");
   const m = state.matrix;
   const months = visibleMonths();
-  const kind = currentKind();
-  const fmt = kind === "count" ? fmtCount : fmtAvg;
+  const fmt = metricFmt(state.metric);
 
   if (!m || !m.rows.length || !months.length) {
     table.innerHTML = `<tbody><tr><td class="empty">Нет данных для отображения</td></tr></tbody>`;

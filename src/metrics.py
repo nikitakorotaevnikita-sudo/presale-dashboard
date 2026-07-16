@@ -1,3 +1,4 @@
+import math
 from collections import defaultdict
 from statistics import mean
 
@@ -77,6 +78,66 @@ def _avg_control(events, dim):
     return {k: mean(d.values()) for k, d in buckets.items() if d}
 
 
+def _round_metric(metric, value):
+    """Округление значения показателя.
+
+    «Ср. длительность» — всегда вверх до целого рабочего дня (math.ceil);
+    остальные средние — до 1 знака; счётчики — как есть.
+    """
+    if value is None:
+        return None
+    if metric == "длительность":
+        return math.ceil(value)
+    if metric in ("трудоемкость", "на_контроле"):
+        return round(value, 1)
+    return value
+
+
+def _count_total(events, status):
+    """Итог по месяцам для счётного показателя: уникальные запросы за месяц."""
+    buckets = defaultdict(set)
+    for e in events:
+        if e.status == status and e.month:
+            buckets[e.month].add(e.request_id)
+    return {m: len(s) for m, s in buckets.items()}
+
+
+def _avg_total(events, metric):
+    """Итог по месяцам для усредняющего показателя: среднее ПО ВСЕМ запросам
+    месяца (а не среднее из средних по разрезам)."""
+    work = defaultdict(float)
+    control = defaultdict(float)
+    hours = {}
+    for e in events:
+        work[e.request_id] += e.work_duration_rd
+        if e.status == STATUS_ON_CONTROL:
+            control[e.request_id] += e.duration_rd
+        if e.status == STATUS_ACCEPTED and e.hours is not None:
+            hours[e.request_id] = e.hours
+    buckets = defaultdict(dict)
+    for e in events:
+        if e.status == STATUS_ACCEPTED and e.month:
+            if metric == "трудоемкость":
+                if e.request_id in hours:
+                    buckets[e.month][e.request_id] = hours[e.request_id]
+            elif metric == "длительность":
+                buckets[e.month][e.request_id] = work[e.request_id]
+            elif metric == "на_контроле":
+                buckets[e.month][e.request_id] = control.get(e.request_id, 0.0)
+    return {m: mean(d.values()) for m, d in buckets.items() if d}
+
+
+def month_totals(events, metric):
+    """Корректный итог по каждому месяцу (для строки ВСЕГО), не зависящий от разреза."""
+    if metric == "поступило":
+        return _count_total(events, STATUS_INIT)
+    if metric == "проработано":
+        return _count_total(events, STATUS_ACCEPTED)
+    if metric in ("трудоемкость", "длительность", "на_контроле"):
+        return _avg_total(events, metric)
+    raise ValueError(f"Неизвестный показатель: {metric}")
+
+
 def compute_cells(events, metric, dim):
     if metric == "поступило":
         return _count(events, STATUS_INIT, dim)
@@ -95,9 +156,12 @@ def build_matrix(events, metric, dim, months=range(1, 13)):
     cells = compute_cells(events, metric, dim)
     month_list = list(months)
     rows = sorted({k[0] for k in cells})
-    values = {rv: {m: cells.get((rv, m)) for m in month_list} for rv in rows}
+    values = {rv: {m: _round_metric(metric, cells.get((rv, m))) for m in month_list}
+              for rv in rows}
+    totals_raw = month_totals(events, metric)
+    totals = {m: _round_metric(metric, totals_raw.get(m)) for m in month_list}
     return {"metric": metric, "dimension": dim, "rows": rows,
-            "months": month_list, "values": values}
+            "months": month_list, "values": values, "totals": totals}
 
 
 def summary(events):
@@ -118,9 +182,9 @@ def summary(events):
     return {
         "поступило": len(init),
         "проработано": len(accepted),
-        "трудоемкость": round(mean(hours.values()), 1) if hours else None,
-        "длительность": round(mean(acc_work), 1) if acc_work else None,
-        "на_контроле": round(mean(acc_control), 1) if acc_control else None,
+        "трудоемкость": _round_metric("трудоемкость", mean(hours.values())) if hours else None,
+        "длительность": _round_metric("длительность", mean(acc_work)) if acc_work else None,
+        "на_контроле": _round_metric("на_контроле", mean(acc_control)) if acc_control else None,
     }
 
 
