@@ -494,7 +494,7 @@ async function openDrilldown(rowName, month) {
     "<th>Команда</th><th>Статус</th><th>Дата начала</th><th>Значение</th></tr></thead><tbody>";
   for (const it of rows) {
     html += "<tr>" +
-      `<td>${escapeHtml(it.request)}</td>` +
+      `<td>${linkify(it.request)}</td>` +
       `<td>${escapeHtml(it.org)}</td>` +
       `<td>${escapeHtml(it.service)}</td>` +
       `<td>${escapeHtml(it.team)}</td>` +
@@ -528,6 +528,15 @@ function escapeHtml(s) {
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 function escapeAttr(s) { return escapeHtml(s).replace(/"/g, "&quot;"); }
+
+// Текст с URL из исходного документа -> кликабельная ссылка (открывается в новой
+// вкладке). Экранируем весь текст, затем найденные http(s)-ссылки заменяем
+// компактным «🔗 Открыть», чтобы описание оставалось читаемым.
+function linkify(s) {
+  const esc = escapeHtml(s == null ? "" : s);
+  return esc.replace(/https?:\/\/[^\s<]+/g, (u) =>
+    `<a href="${u}" target="_blank" rel="noopener noreferrer">🔗 Открыть</a>`);
+}
 
 async function refreshAll() {
   await renderKpi();
