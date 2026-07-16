@@ -101,6 +101,20 @@ def test_export_endpoint(tmp_path, monkeypatch):
         "application/vnd.openxmlformats")
 
 
+def test_metrics_filter_by_service_with_comma(tmp_path, monkeypatch):
+    # регрессия: значение услуги содержит запятые — фильтр не должен «терять» данные
+    client = make_client(tmp_path, monkeypatch)
+    upload_fixture(client)
+    svc = "Встречи (демо, консультации)"
+    r = client.get("/api/metrics", params={
+        "metric": "поступило", "dimension": "услуга", "services": [svc]})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["rows"] == [svc]
+    # есть хотя бы одно ненулевое значение по месяцам
+    assert any(v for v in body["values"][svc].values())
+
+
 def test_export_respects_month_filter(tmp_path, monkeypatch):
     client = make_client(tmp_path, monkeypatch)
     upload_fixture(client)

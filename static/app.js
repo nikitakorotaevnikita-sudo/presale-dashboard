@@ -44,7 +44,13 @@ async function api(path, params) {
   const url = new URL(path, window.location.origin);
   if (params) {
     for (const [k, v] of Object.entries(params)) {
-      if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
+      if (v === undefined || v === null) continue;
+      if (Array.isArray(v)) {
+        // повторяющиеся параметры: services=A&services=B (устойчиво к запятым в значениях)
+        for (const item of v) if (item !== "" && item !== null && item !== undefined) url.searchParams.append(k, item);
+      } else if (v !== "") {
+        url.searchParams.set(k, v);
+      }
     }
   }
   const r = await fetch(url);
@@ -56,15 +62,15 @@ async function api(path, params) {
   return r.json();
 }
 
-// фильтры (кроме месяца) -> query-параметры API
+// фильтры (кроме месяца) -> query-параметры API (массивы -> повторяющиеся параметры)
 function apiFilterParams() {
-  const join = (s) => Array.from(s).join(",");
+  const arr = (s) => Array.from(s);
   return {
-    services: join(state.filters["услуга"]),
-    products: join(state.filters["продукт"]),
-    scales: join(state.filters["масштаб"]),
-    teams: join(state.filters["команда"]),
-    initiators: join(state.filters["инициатор"]),
+    services: arr(state.filters["услуга"]),
+    products: arr(state.filters["продукт"]),
+    scales: arr(state.filters["масштаб"]),
+    teams: arr(state.filters["команда"]),
+    initiators: arr(state.filters["инициатор"]),
   };
 }
 
@@ -509,7 +515,7 @@ function exportExcel() {
   const url = new URL("/api/export", window.location.origin);
   url.searchParams.set("dimension", state.dimension);
   const p = apiFilterParams();
-  for (const [k, v] of Object.entries(p)) if (v) url.searchParams.set(k, v);
+  for (const [k, vals] of Object.entries(p)) for (const v of vals) if (v) url.searchParams.append(k, v);
   const selMonths = state.filters["месяц"];
   if (selMonths.size > 0) {
     url.searchParams.set("months", Array.from(selMonths).map(Number).sort((a, b) => a - b).join(","));

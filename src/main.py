@@ -3,7 +3,7 @@ import zipfile
 from contextlib import closing
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from openpyxl.utils.exceptions import InvalidFileException
@@ -41,10 +41,6 @@ def _fix_form_encoding(value: str) -> str:
         return value
 
 
-def _list_param(value):
-    return [v for v in value.split(",") if v] if value else None
-
-
 def _events_filtered(conn, q):
     events = storage.load_events(conn)
     return metrics.filter_events(
@@ -55,9 +51,11 @@ def _events_filtered(conn, q):
 
 
 def _filters_from_query(services, products, scales, teams, initiators):
-    return {"services": _list_param(services), "products": _list_param(products),
-            "scales": _list_param(scales), "teams": _list_param(teams),
-            "initiators": _list_param(initiators)}
+    # фильтры приходят повторяющимися query-параметрами (list[str]),
+    # поэтому значения с запятыми («Встречи (демо, консультации)») не рвутся
+    return {"services": services or None, "products": products or None,
+            "scales": scales or None, "teams": teams or None,
+            "initiators": initiators or None}
 
 
 @app.get("/api/health")
@@ -100,8 +98,11 @@ def filters():
 
 @app.get("/api/metrics")
 def get_metrics(metric: str, dimension: str,
-                services: str = "", products: str = "", scales: str = "",
-                teams: str = "", initiators: str = ""):
+                services: list[str] = Query(default=[]),
+                products: list[str] = Query(default=[]),
+                scales: list[str] = Query(default=[]),
+                teams: list[str] = Query(default=[]),
+                initiators: list[str] = Query(default=[])):
     if metric not in metrics.METRICS:
         raise HTTPException(400, f"Неизвестный показатель: {metric}")
     with closing(_conn()) as conn:
@@ -112,8 +113,11 @@ def get_metrics(metric: str, dimension: str,
 
 @app.get("/api/requests")
 def get_requests(metric: str, dimension: str, value: str, month: int,
-                 services: str = "", products: str = "", scales: str = "",
-                 teams: str = "", initiators: str = ""):
+                 services: list[str] = Query(default=[]),
+                 products: list[str] = Query(default=[]),
+                 scales: list[str] = Query(default=[]),
+                 teams: list[str] = Query(default=[]),
+                 initiators: list[str] = Query(default=[])):
     with closing(_conn()) as conn:
         events = _events_filtered(conn, _filters_from_query(
             services, products, scales, teams, initiators))
@@ -121,8 +125,11 @@ def get_requests(metric: str, dimension: str, value: str, month: int,
 
 
 @app.get("/api/summary")
-def get_summary(services: str = "", products: str = "", scales: str = "",
-                teams: str = "", initiators: str = ""):
+def get_summary(services: list[str] = Query(default=[]),
+                products: list[str] = Query(default=[]),
+                scales: list[str] = Query(default=[]),
+                teams: list[str] = Query(default=[]),
+                initiators: list[str] = Query(default=[])):
     with closing(_conn()) as conn:
         events = _events_filtered(conn, _filters_from_query(
             services, products, scales, teams, initiators))
@@ -131,8 +138,11 @@ def get_summary(services: str = "", products: str = "", scales: str = "",
 
 @app.get("/api/export")
 def get_export(dimension: str = "услуга", months: str = "",
-               services: str = "", products: str = "", scales: str = "",
-               teams: str = "", initiators: str = ""):
+               services: list[str] = Query(default=[]),
+               products: list[str] = Query(default=[]),
+               scales: list[str] = Query(default=[]),
+               teams: list[str] = Query(default=[]),
+               initiators: list[str] = Query(default=[])):
     month_list = sorted([int(x) for x in months.split(",") if x.strip()]) if months else list(range(1, 13))
     with closing(_conn()) as conn:
         events = _events_filtered(conn, _filters_from_query(
