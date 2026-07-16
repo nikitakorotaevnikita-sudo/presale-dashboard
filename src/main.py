@@ -42,7 +42,7 @@ def _fix_form_encoding(value: str) -> str:
 
 
 def _events_filtered(conn, q):
-    events = storage.load_events(conn)
+    events = metrics.drop_excluded_months(storage.load_events(conn))
     return metrics.filter_events(
         events,
         services=q.get("services"), products=q.get("products"),

@@ -20,6 +20,8 @@ const MONTH_NAMES = ["", "Январь", "Февраль", "Март", "Апре
   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 const MONTH_SHORT = ["", "Янв", "Фев", "Мар", "Апр", "Май", "Июн",
   "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+// Месяцы, исключённые из дашборда (совпадает с исключением на бэкенде).
+const EXCLUDED_MONTHS = new Set([12]);
 
 // разрез UI -> поле в /api/requests
 const DIM_TO_FIELD = {
@@ -79,17 +81,11 @@ function lastDataMonth() {
   const m = state.matrix;
   if (!m) return null;
   let last = 0;
-  if (m.totals) {
-    for (const mm of m.months) {
-      const v = m.totals[String(mm)];
-      if (v !== null && v !== undefined) last = Math.max(last, mm);
-    }
-  }
-  for (const r of m.rows) {
-    for (const mm of m.months) {
-      const v = cellVal(r, mm);
-      if (v !== null && v !== undefined) last = Math.max(last, mm);
-    }
+  for (const mm of m.months) {
+    if (EXCLUDED_MONTHS.has(mm)) continue;
+    let has = m.totals && m.totals[String(mm)] !== null && m.totals[String(mm)] !== undefined;
+    if (!has) has = m.rows.some((r) => { const v = cellVal(r, mm); return v !== null && v !== undefined; });
+    if (has) last = Math.max(last, mm);
   }
   return last || null;
 }
@@ -97,7 +93,8 @@ function lastDataMonth() {
 // видимые месяцы: фильтр месяца — на клиенте; без фильтра годовой вид
 // обрезается по последний месяц актуализации (не показываем пустые будущие месяцы)
 function visibleMonths() {
-  const all = state.matrix ? state.matrix.months : Array.from({ length: 12 }, (_, i) => i + 1);
+  const base = state.matrix ? state.matrix.months : Array.from({ length: 12 }, (_, i) => i + 1);
+  const all = base.filter((m) => !EXCLUDED_MONTHS.has(m));
   const sel = state.filters["месяц"];
   if (sel.size > 0) return all.filter((m) => sel.has(String(m)));
   const last = lastDataMonth();
@@ -206,8 +203,10 @@ function renderFilters() {
   const row = document.getElementById("filters-row");
   row.innerHTML = "";
 
-  // месяц
-  const monthOpts = Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: MONTH_NAMES[i + 1] }));
+  // месяц (без исключённых, напр. декабря)
+  const monthOpts = Array.from({ length: 12 }, (_, i) => i + 1)
+    .filter((m) => !EXCLUDED_MONTHS.has(m))
+    .map((m) => ({ value: String(m), label: MONTH_NAMES[m] }));
   row.appendChild(buildFilter("месяц", "Месяц", monthOpts));
 
   // 5 разрезов

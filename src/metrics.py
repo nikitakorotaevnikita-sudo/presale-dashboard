@@ -11,6 +11,15 @@ STATUS_ON_CONTROL = "На контроле"
 
 METRICS = ["поступило", "проработано", "трудоемкость", "длительность", "на_контроле"]
 
+# Месяцы, исключаемые из расчётов и визуализации. Декабрь — записи прошлого
+# года (номер месяца в модели не различает год), в дашборде их не учитываем.
+# Сами строки остаются в БД, исключение применяется только при агрегации.
+EXCLUDED_MONTHS = frozenset({12})
+
+
+def drop_excluded_months(events):
+    return [e for e in events if e.month not in EXCLUDED_MONTHS]
+
 
 def _attr(dim):
     if dim not in DIMENSION_ATTR:

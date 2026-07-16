@@ -92,6 +92,18 @@ def test_drilldown_includes_value_field():
     assert init and init[0]["value"] == 1
 
 
+def test_december_excluded_from_metrics():
+    events = [
+        ev("1", "Инициализация", 12, service="A"),  # декабрь — исключается
+        ev("2", "Инициализация", 1, service="A"),
+    ]
+    kept = metrics.drop_excluded_months(events)
+    assert {e.month for e in kept} == {1}
+    cells = metrics.compute_cells(kept, "поступило", "услуга")
+    assert cells.get(("A", 12)) is None
+    assert cells.get(("A", 1)) == 1
+
+
 def test_month_totals_avg_over_all_requests():
     # услуга A: 2 запроса (10, 20); услуга B: 1 запрос (60)
     events = [
