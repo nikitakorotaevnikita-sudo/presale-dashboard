@@ -22,6 +22,7 @@ class StatusEvent:
     work_duration_rd: float  # «Длительность проработки запроса (раб. дн.)»
     hours: Optional[float]
     note: str
+    link: str = ""  # URL из гиперссылки ячейки «Запрос на пресейл» (Aura)
 
 
 EVENT_FIELDS = [f.name for f in fields(StatusEvent)]

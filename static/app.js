@@ -494,7 +494,7 @@ async function openDrilldown(rowName, month) {
     "<th>Команда</th><th>Статус</th><th>Дата начала</th><th>Значение</th></tr></thead><tbody>";
   for (const it of rows) {
     html += "<tr>" +
-      `<td>${linkify(it.request)}</td>` +
+      `<td>${requestCell(it.request, it.link)}</td>` +
       `<td>${escapeHtml(it.org)}</td>` +
       `<td>${escapeHtml(it.service)}</td>` +
       `<td>${escapeHtml(it.team)}</td>` +
@@ -529,11 +529,13 @@ function escapeHtml(s) {
 }
 function escapeAttr(s) { return escapeHtml(s).replace(/"/g, "&quot;"); }
 
-// Текст с URL из исходного документа -> кликабельная ссылка (открывается в новой
-// вкладке). Экранируем весь текст, затем найденные http(s)-ссылки заменяем
-// компактным «🔗 Открыть», чтобы описание оставалось читаемым.
-function linkify(s) {
-  const esc = escapeHtml(s == null ? "" : s);
+// Название запроса как ссылка. Приоритет — URL из гиперссылки ячейки (поле link);
+// если его нет, ищем http(s)-ссылку прямо в тексте (запасной вариант).
+function requestCell(text, link) {
+  const esc = escapeHtml(text == null ? "" : text);
+  if (link) {
+    return `<a href="${escapeAttr(link)}" target="_blank" rel="noopener noreferrer">${esc}</a>`;
+  }
   return esc.replace(/https?:\/\/[^\s<]+/g, (u) =>
     `<a href="${u}" target="_blank" rel="noopener noreferrer">🔗 Открыть</a>`);
 }

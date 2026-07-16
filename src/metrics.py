@@ -215,7 +215,7 @@ def drilldown(events, metric, dim, value, month):
     for rid, e in seen.items():
         item = {"request_id": rid, "request": e.request, "org": e.org,
                 "service": e.service, "team": e.team, "status": e.status,
-                "date_start": e.date_start}
+                "date_start": e.date_start, "link": e.link}
         item["value"] = 1  # по умолчанию: каждый запрос считается за 1 (поступило/проработано)
         if metric == "трудоемкость":
             item["value"] = e.hours

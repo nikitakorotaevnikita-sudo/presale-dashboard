@@ -13,16 +13,20 @@ def connect(path):
     return conn
 
 
+_REAL_FIELDS = ("duration_rd", "work_duration_rd", "hours")
+_INT_FIELDS = ("month",)
+
+
+def _col_type(f):
+    if f in _REAL_FIELDS:
+        return "REAL"
+    if f in _INT_FIELDS:
+        return "INTEGER"
+    return "TEXT"
+
+
 def init_db(conn):
-    cols_ddl = ", ".join(
-        f"{f} TEXT" if f in (
-            "request_id", "request", "org", "product", "scale", "service",
-            "initiator", "team", "business_unit", "status", "prev_status",
-            "date_start", "date_end", "note",
-        ) else f"{f} REAL" if f in ("duration_rd", "work_duration_rd", "hours")
-        else f"{f} INTEGER"
-        for f in EVENT_FIELDS
-    )
+    cols_ddl = ", ".join(f"{f} {_col_type(f)}" for f in EVENT_FIELDS)
     conn.executescript(f"""
         CREATE TABLE IF NOT EXISTS status_events ({cols_ddl});
         CREATE TABLE IF NOT EXISTS uploads (
@@ -30,6 +34,11 @@ def init_db(conn):
             filename TEXT, uploaded_at TEXT, row_count INTEGER, uploaded_by TEXT
         );
     """)
+    # миграция: добавить недостающие колонки в уже существующую таблицу
+    existing = {r[1] for r in conn.execute("PRAGMA table_info(status_events)")}
+    for f in EVENT_FIELDS:
+        if f not in existing:
+            conn.execute(f"ALTER TABLE status_events ADD COLUMN {f} {_col_type(f)}")
     conn.commit()
 
 

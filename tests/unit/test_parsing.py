@@ -18,6 +18,13 @@ def test_parse_returns_events():
     assert isinstance(e.month, int) and 1 <= e.month <= 12
 
 
+def test_parse_extracts_cell_hyperlinks():
+    events = parse_workbook(FIXTURE)
+    linked = [e for e in events if e.link]
+    assert len(linked) > 100  # ссылка привязана почти к каждому запросу
+    assert any(e.link.startswith("https://aura") for e in linked)
+
+
 def test_parse_missing_sheet(tmp_path):
     p = tmp_path / "bad.xlsx"
     wb = openpyxl.Workbook()
