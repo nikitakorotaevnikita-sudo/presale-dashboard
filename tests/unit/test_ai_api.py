@@ -37,6 +37,14 @@ def test_settings_save_and_mask(tmp_path, monkeypatch):
     assert r.json()["token"].endswith("ret9") and "super" not in r.json()["token"]
 
 
+def test_settings_reject_bad_url(tmp_path, monkeypatch):
+    _, client = make_client(tmp_path, monkeypatch)
+    r = client.post("/api/settings/llm", json={"provider": "local", "base_url": "ftp://x", "model": "m", "token": ""})
+    assert r.status_code == 422
+    r2 = client.post("/api/settings/llm", json={"provider": "local", "base_url": "", "model": "m", "token": ""})
+    assert r2.status_code == 422
+
+
 def test_suggestions(tmp_path, monkeypatch):
     _, client = make_client(tmp_path, monkeypatch)
     r = client.get("/api/chat/suggestions")

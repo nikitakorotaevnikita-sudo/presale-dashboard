@@ -8,7 +8,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openpyxl.utils.exceptions import InvalidFileException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from src import config, storage, metrics, export, settings_store, chat_service, llm_service
 from src.parsing import parse_workbook, ParseError
@@ -162,6 +162,21 @@ class LLMSettings(BaseModel):
     base_url: str
     model: str
     token: str = ""
+
+    @field_validator("base_url")
+    @classmethod
+    def _validate_base_url(cls, v: str) -> str:
+        v = v.strip()
+        if not v or not (v.startswith("http://") or v.startswith("https://")):
+            raise ValueError("base_url должен быть непустым и начинаться с http:// или https://")
+        return v
+
+    @field_validator("model")
+    @classmethod
+    def _validate_model(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("model не должен быть пустым")
+        return v
 
 
 class ChatBody(BaseModel):
