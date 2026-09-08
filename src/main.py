@@ -178,6 +178,13 @@ def _load_events_or_400():
     return events, upload, cfg
 
 
+def _fake_stream_response():
+    # LLM_FAKE — ТОЛЬКО для E2E-тестов; НЕ устанавливать в проде.
+    def gen_fake():
+        yield "Тестовый ответ: узкое место — команда Slow (ср. длительность высокая)."
+    return StreamingResponse(gen_fake(), media_type="text/plain; charset=utf-8")
+
+
 @app.get("/api/settings/llm")
 def get_llm_settings():
     with closing(_conn()) as conn:
@@ -210,9 +217,7 @@ def chat(body: ChatBody):
     events, upload, cfg = _load_events_or_400()
 
     if os.environ.get("LLM_FAKE") == "1":
-        def gen_fake():
-            yield "Тестовый ответ: узкое место — команда Slow (ср. длительность высокая)."
-        return StreamingResponse(gen_fake(), media_type="text/plain; charset=utf-8")
+        return _fake_stream_response()
 
     def gen():
         try:
@@ -228,9 +233,7 @@ def analyze():
     events, upload, cfg = _load_events_or_400()
 
     if os.environ.get("LLM_FAKE") == "1":
-        def gen_fake():
-            yield "Тестовый ответ: узкое место — команда Slow (ср. длительность высокая)."
-        return StreamingResponse(gen_fake(), media_type="text/plain; charset=utf-8")
+        return _fake_stream_response()
 
     def gen():
         try:
