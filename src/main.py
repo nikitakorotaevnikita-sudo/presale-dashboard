@@ -171,9 +171,10 @@ def _load_events_or_400():
     with closing(_conn()) as conn:
         events = storage.load_events(conn)
         upload = storage.last_upload(conn)
+        cfg = settings_store.get_llm_config(conn)
     if not events:
         raise HTTPException(400, "Сначала загрузите данные")
-    return events, upload
+    return events, upload, cfg
 
 
 @app.get("/api/settings/llm")
@@ -205,9 +206,7 @@ def chat_suggestions():
 
 @app.post("/api/chat")
 def chat(body: ChatBody):
-    events, upload = _load_events_or_400()
-    with closing(_conn()) as conn:
-        cfg = settings_store.get_llm_config(conn)
+    events, upload, cfg = _load_events_or_400()
 
     def gen():
         try:
@@ -220,9 +219,7 @@ def chat(body: ChatBody):
 
 @app.post("/api/analyze")
 def analyze():
-    events, upload = _load_events_or_400()
-    with closing(_conn()) as conn:
-        cfg = settings_store.get_llm_config(conn)
+    events, upload, cfg = _load_events_or_400()
 
     def gen():
         try:

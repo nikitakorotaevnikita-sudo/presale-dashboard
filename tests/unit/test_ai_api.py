@@ -58,3 +58,18 @@ def test_chat_no_data(tmp_path, monkeypatch):
     r = client.post("/api/chat", json={"messages": [{"role": "user", "content": "q"}]})
     assert r.status_code == 400
     assert "данны" in r.json()["detail"].lower()
+
+
+def test_chat_llm_error_in_stream(tmp_path, monkeypatch):
+    main, client = make_client(tmp_path, monkeypatch)
+    upload_fixture(client)
+
+    def raising_stream(*a, **k):
+        raise main.llm_service.LLMError("нет связи")
+        yield  # noqa: unreachable, делает функцию генератором
+
+    monkeypatch.setattr(main.chat_service, "stream_answer", raising_stream)
+    r = client.post("/api/chat", json={"messages": [{"role": "user", "content": "q"}]})
+    assert r.status_code == 200
+    assert "Ошибка модели" in r.text
+    assert "Бэкофис" in r.text
