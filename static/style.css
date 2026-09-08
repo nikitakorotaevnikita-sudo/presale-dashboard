@@ -226,3 +226,18 @@ table { border-collapse: collapse; width: 100%; font-size: 13px; }
 #drill-table th, #drill-table td { border-bottom: 1px solid var(--border); padding: 7px 8px; text-align: left; font-size: 12px; vertical-align: top; }
 #drill-table thead th { color: var(--muted); font-weight: 600; }
 .empty { color: var(--muted); padding: 24px 0; text-align: center; }
+
+/* ---- верхние вкладки, ИИ-аналитик, Бэкофис ---- */
+#top-nav { display: flex; gap: 6px; margin: 8px 0; }
+.topnav__btn { padding: 6px 14px; border: 1px solid #cdd6e4; background: #fff; border-radius: 6px; cursor: pointer; }
+.topnav__btn--active { background: #1f3a5f; color: #fff; border-color: #1f3a5f; }
+#chat-log { height: 52vh; overflow-y: auto; border: 1px solid #e3eaf5; border-radius: 8px; padding: 10px; background: #f6f8fc; }
+.bubble { max-width: 80%; margin: 6px 0; padding: 8px 12px; border-radius: 10px; white-space: pre-wrap; }
+.bubble--user { margin-left: auto; background: #1f3a5f; color: #fff; }
+.bubble--assistant { background: #fff; border: 1px solid #e3eaf5; }
+#chat-form { display: flex; gap: 8px; margin-top: 8px; }
+#chat-input { flex: 1; padding: 8px; border: 1px solid #cdd6e4; border-radius: 6px; }
+#chat-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.suggestion { font-size: 12px; padding: 4px 10px; border: 1px solid #cdd6e4; border-radius: 12px; background: #fff; cursor: pointer; }
+#llm-form label { display: block; margin: 8px 0; }
+#llm-form input { width: 360px; max-width: 100%; padding: 6px; margin-left: 8px; }

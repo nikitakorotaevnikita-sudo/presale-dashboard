@@ -619,3 +619,130 @@ async function init() {
 }
 
 document.addEventListener("DOMContentLoaded", init);
+
+// ---- верхние вкладки (Дашборд / ИИ-аналитик / Бэкофис) ----
+function switchView(view) {
+  for (const v of ["dashboard", "ai", "backoffice"]) {
+    document.getElementById("view-" + v).hidden = v !== view;
+  }
+  document.querySelectorAll(".topnav__btn").forEach((b) =>
+    b.classList.toggle("topnav__btn--active", b.dataset.view === view));
+  if (view === "ai") initAi();
+  if (view === "backoffice") loadLlmSettings();
+}
+document.getElementById("top-nav").addEventListener("click", (e) => {
+  const b = e.target.closest(".topnav__btn");
+  if (b) switchView(b.dataset.view);
+});
+
+// ---- Бэкофис: настройки LLM ----
+async function loadLlmSettings() {
+  try {
+    const c = await api("/api/settings/llm");
+    document.getElementById("llm-provider").value = c.provider || "local";
+    document.getElementById("llm-base-url").value = c.base_url || "";
+    document.getElementById("llm-model").value = c.model || "";
+    document.getElementById("llm-token").placeholder =
+      c.token ? c.token + " (сохранён — оставьте пустым, чтобы не менять)" : "введите токен";
+  } catch (e) { document.getElementById("llm-status").textContent = "Ошибка: " + e.message; }
+}
+document.getElementById("llm-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = {
+    provider: document.getElementById("llm-provider").value,
+    base_url: document.getElementById("llm-base-url").value,
+    model: document.getElementById("llm-model").value,
+    token: document.getElementById("llm-token").value,
+  };
+  try {
+    await fetch("/api/settings/llm", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body) }).then((r) => { if (!r.ok) throw new Error("Ошибка сохранения"); });
+    document.getElementById("llm-token").value = "";
+    document.getElementById("llm-status").textContent = "Сохранено";
+    loadLlmSettings();
+  } catch (e) { document.getElementById("llm-status").textContent = e.message; }
+});
+document.getElementById("llm-test").addEventListener("click", async () => {
+  const s = document.getElementById("llm-status");
+  s.textContent = "Проверка…";
+  try {
+    const r = await fetch("/api/llm/test", { method: "POST" }).then((x) => x.json());
+    s.textContent = r.message;
+  } catch (e) { s.textContent = "Ошибка: " + e.message; }
+});
+
+// ---- ИИ-аналитик: чат со стримингом ----
+let aiInited = false;
+const chatHistory = [];  // {role, content}
+
+async function initAi() {
+  if (aiInited) return;
+  aiInited = true;
+  try {
+    const { suggestions } = await api("/api/chat/suggestions");
+    const box = document.getElementById("chat-suggestions");
+    box.innerHTML = "";
+    for (const s of suggestions) {
+      const b = document.createElement("button");
+      b.className = "suggestion";
+      b.textContent = s;
+      b.addEventListener("click", () => sendChat(s));
+      box.appendChild(b);
+    }
+  } catch (_) {}
+}
+
+function appendBubble(role, text) {
+  const log = document.getElementById("chat-log");
+  const d = document.createElement("div");
+  d.className = "bubble bubble--" + role;
+  d.textContent = text;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+  return d;
+}
+
+async function streamInto(url, body, bubble) {
+  const r = await fetch(url, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+  if (!r.ok) {
+    let msg = "Ошибка " + r.status;
+    try { msg = (await r.json()).detail || msg; } catch (_) {}
+    bubble.textContent = msg;
+    return "";
+  }
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let acc = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    acc += dec.decode(value, { stream: true });
+    bubble.textContent = acc;
+    document.getElementById("chat-log").scrollTop = 1e9;
+  }
+  return acc;
+}
+
+async function sendChat(text) {
+  const input = document.getElementById("chat-input");
+  const q = text || input.value.trim();
+  if (!q) return;
+  input.value = "";
+  appendBubble("user", q);
+  chatHistory.push({ role: "user", content: q });
+  const bubble = appendBubble("assistant", "…");
+  const answer = await streamInto("/api/chat", { messages: chatHistory }, bubble);
+  if (answer) chatHistory.push({ role: "assistant", content: answer });
+}
+
+document.getElementById("chat-form").addEventListener("submit", (e) => {
+  e.preventDefault(); sendChat();
+});
+document.getElementById("analyze-btn").addEventListener("click", async () => {
+  appendBubble("user", "Анализ узких мест");
+  const bubble = appendBubble("assistant", "…");
+  await streamInto("/api/analyze", {}, bubble);
+});
