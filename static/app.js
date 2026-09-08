@@ -675,6 +675,16 @@ document.getElementById("llm-test").addEventListener("click", async () => {
 // ---- ИИ-аналитик: чат со стримингом ----
 let aiInited = false;
 const chatHistory = [];  // {role, content}
+let aiBusy = false;
+
+function setAiControlsDisabled(disabled) {
+  const submitBtn = document.querySelector("#chat-form button[type=\"submit\"]");
+  const chatInput = document.getElementById("chat-input");
+  const analyzeBtn = document.getElementById("analyze-btn");
+  if (submitBtn) submitBtn.disabled = disabled;
+  if (chatInput) chatInput.disabled = disabled;
+  if (analyzeBtn) analyzeBtn.disabled = disabled;
+}
 
 async function initAi() {
   if (aiInited) return;
@@ -727,22 +737,46 @@ async function streamInto(url, body, bubble) {
 }
 
 async function sendChat(text) {
+  if (aiBusy) return;
   const input = document.getElementById("chat-input");
   const q = text || input.value.trim();
   if (!q) return;
-  input.value = "";
-  appendBubble("user", q);
-  chatHistory.push({ role: "user", content: q });
-  const bubble = appendBubble("assistant", "…");
-  const answer = await streamInto("/api/chat", { messages: chatHistory }, bubble);
-  if (answer) chatHistory.push({ role: "assistant", content: answer });
+  aiBusy = true;
+  setAiControlsDisabled(true);
+  try {
+    input.value = "";
+    appendBubble("user", q);
+    chatHistory.push({ role: "user", content: q });
+    const bubble = appendBubble("assistant", "…");
+    try {
+      const answer = await streamInto("/api/chat", { messages: chatHistory }, bubble);
+      if (answer) chatHistory.push({ role: "assistant", content: answer });
+    } catch (e) {
+      bubble.textContent = "Сетевая ошибка: " + e.message;
+    }
+  } finally {
+    aiBusy = false;
+    setAiControlsDisabled(false);
+  }
 }
 
 document.getElementById("chat-form").addEventListener("submit", (e) => {
   e.preventDefault(); sendChat();
 });
 document.getElementById("analyze-btn").addEventListener("click", async () => {
-  appendBubble("user", "Анализ узких мест");
-  const bubble = appendBubble("assistant", "…");
-  await streamInto("/api/analyze", {}, bubble);
+  if (aiBusy) return;
+  aiBusy = true;
+  setAiControlsDisabled(true);
+  try {
+    appendBubble("user", "Анализ узких мест");
+    const bubble = appendBubble("assistant", "…");
+    try {
+      await streamInto("/api/analyze", {}, bubble);
+    } catch (e) {
+      bubble.textContent = "Сетевая ошибка: " + e.message;
+    }
+  } finally {
+    aiBusy = false;
+    setAiControlsDisabled(false);
+  }
 });
