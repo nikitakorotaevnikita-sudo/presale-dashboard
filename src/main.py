@@ -4,11 +4,12 @@ from contextlib import closing
 from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openpyxl.utils.exceptions import InvalidFileException
+from pydantic import BaseModel
 
-from src import config, storage, metrics, export
+from src import config, storage, metrics, export, settings_store, chat_service, llm_service
 from src.parsing import parse_workbook, ParseError
 
 app = FastAPI(title="Дашборд пресейла ОГВ")
@@ -18,6 +19,7 @@ def _conn():
     config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = storage.connect(config.DB_PATH)
     storage.init_db(conn)
+    settings_store.ensure(conn)
     return conn
 
 
@@ -152,6 +154,83 @@ def get_export(dimension: str = "услуга", months: str = "",
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="presale_metrics.xlsx"'})
+
+
+class LLMSettings(BaseModel):
+    provider: str = "local"
+    base_url: str
+    model: str
+    token: str = ""
+
+
+class ChatBody(BaseModel):
+    messages: list[dict]
+
+
+def _load_events_or_400():
+    with closing(_conn()) as conn:
+        events = storage.load_events(conn)
+        upload = storage.last_upload(conn)
+    if not events:
+        raise HTTPException(400, "Сначала загрузите данные")
+    return events, upload
+
+
+@app.get("/api/settings/llm")
+def get_llm_settings():
+    with closing(_conn()) as conn:
+        return settings_store.masked_config(conn)
+
+
+@app.post("/api/settings/llm")
+def save_llm_settings(body: LLMSettings):
+    with closing(_conn()) as conn:
+        settings_store.save_llm_config(
+            conn, body.provider, body.base_url, body.model, body.token)
+        return settings_store.masked_config(conn)
+
+
+@app.post("/api/llm/test")
+def test_llm():
+    with closing(_conn()) as conn:
+        cfg = settings_store.get_llm_config(conn)
+    ok, message = llm_service.test_connection(cfg)
+    return {"ok": ok, "message": message}
+
+
+@app.get("/api/chat/suggestions")
+def chat_suggestions():
+    return {"suggestions": chat_service.SUGGESTIONS}
+
+
+@app.post("/api/chat")
+def chat(body: ChatBody):
+    events, upload = _load_events_or_400()
+    with closing(_conn()) as conn:
+        cfg = settings_store.get_llm_config(conn)
+
+    def gen():
+        try:
+            yield from chat_service.stream_answer(cfg, events, body.messages, upload)
+        except llm_service.LLMError as exc:
+            yield f"\n\n[Ошибка модели: {exc}. Проверьте настройки в Бэкофисе.]"
+
+    return StreamingResponse(gen(), media_type="text/plain; charset=utf-8")
+
+
+@app.post("/api/analyze")
+def analyze():
+    events, upload = _load_events_or_400()
+    with closing(_conn()) as conn:
+        cfg = settings_store.get_llm_config(conn)
+
+    def gen():
+        try:
+            yield from chat_service.stream_analysis(cfg, events, upload)
+        except llm_service.LLMError as exc:
+            yield f"\n\n[Ошибка модели: {exc}. Проверьте настройки в Бэкофисе.]"
+
+    return StreamingResponse(gen(), media_type="text/plain; charset=utf-8")
 
 
 # статика монтируется последней, чтобы не перехватывать /api/*
