@@ -9,6 +9,26 @@ const METRICS = [
   { key: "на_контроле", label: "Ср. на контроле", kind: "avg" },
 ];
 const DIMENSIONS = ["услуга", "продукт", "масштаб", "инициатор", "команда"];
+// единицы измерения показателей (для заголовков таблицы и графика)
+const METRIC_UNIT = {
+  "трудоемкость": "в часах",
+  "длительность": "в раб. днях",
+  "на_контроле": "в раб. днях",
+};
+// пояснения к значениям разреза «Масштаб» (по числу пользователей)
+const SCALE_HINTS = [
+  { match: /ФОИВ/i, text: "от 1000 пользователей" },
+  { match: /РОИВ/i, text: "от 500 пользователей" },
+  { match: /друг/i, text: "до 500 пользователей" },
+];
+// подпись значения с пояснением (для «Масштаба»)
+function valueLabel(value) {
+  if (state.dimension === "масштаб") {
+    const h = SCALE_HINTS.find((x) => x.match.test(value));
+    if (h) return `${value} — ${h.text}`;
+  }
+  return value;
+}
 const KPI_CARDS = [
   { key: "поступило", label: "Поступило", kind: "count" },
   { key: "проработано", label: "Проработано", kind: "count" },
@@ -368,20 +388,33 @@ function renderTable() {
   const m = state.matrix;
   const months = visibleMonths();
   const fmt = metricFmt(state.metric);
+  const isCount = currentKind() === "count";
+  const TCOL = ' style="font-weight:600;border-left:2px solid #cdd6e4"';
 
   if (!m || !m.rows.length || !months.length) {
     table.innerHTML = `<tbody><tr><td class="empty">Нет данных для отображения</td></tr></tbody>`;
     return;
   }
 
+  // «Всего» по строке: для count — сумма по месяцам, для средних — среднее непустых
+  const aggregate = (vals) => {
+    const xs = vals.filter((v) => v !== null && v !== undefined);
+    if (!xs.length) return null;
+    const sum = xs.reduce((a, b) => a + b, 0);
+    return isCount ? sum : sum / xs.length;
+  };
+  const rowTotal = (r) => aggregate(months.map((mm) => cellVal(r, mm)));
+  const grandTotal = () => aggregate(months.map((mm) => totalForMonth(mm)));
+
   let head = "<thead><tr><th>" +
     state.dimension.charAt(0).toUpperCase() + state.dimension.slice(1) + "</th>";
   for (const mm of months) head += `<th>${MONTH_SHORT[mm]}</th>`;
+  head += `<th${TCOL}>Всего</th>`;
   head += "</tr></thead>";
 
   let body = "<tbody>";
   for (const r of m.rows) {
-    body += `<tr><td>${escapeHtml(r)}</td>`;
+    body += `<tr><td>${escapeHtml(valueLabel(r))}</td>`;
     for (const mm of months) {
       const v = cellVal(r, mm);
       const txt = fmt(v);
@@ -389,14 +422,21 @@ function renderTable() {
       const attrs = txt !== "" ? ` data-row="${escapeAttr(r)}" data-month="${mm}"` : "";
       body += `<td${cls}${attrs}>${txt}</td>`;
     }
+    body += `<td${TCOL}>${fmt(rowTotal(r))}</td>`;
     body += "</tr>";
   }
   // ВСЕГО
   body += `<tr class="total-row"><td>ВСЕГО</td>`;
   for (const mm of months) body += `<td>${fmt(totalForMonth(mm))}</td>`;
+  body += `<td${TCOL}>${fmt(grandTotal())}</td>`;
   body += "</tr></tbody>";
 
-  table.innerHTML = head + body;
+  const label = METRICS.find((x) => x.key === state.metric).label;
+  const unit = METRIC_UNIT[state.metric];
+  const caption = `<caption style="caption-side:top;text-align:left;font-weight:600;padding:6px 2px;color:#1c2430">` +
+    `${escapeHtml(unit ? label + " " + unit : label)}</caption>`;
+
+  table.innerHTML = caption + head + body;
 
   table.querySelectorAll("td.cell--clickable").forEach((td) => {
     td.addEventListener("click", () =>
@@ -426,6 +466,7 @@ function renderChart() {
     borderWidth: 2,
     tension: .25,
     spanGaps: true,
+    hidden: true,  // по умолчанию скрыта; включается кликом по легенде
   };
 
   const ranked = m.rows.slice().map((r) => {
@@ -435,7 +476,7 @@ function renderChart() {
   }).sort((a, b) => b.score - a.score).slice(0, 6);
 
   const rowSeries = ranked.map((item, i) => ({
-    label: item.r,
+    label: valueLabel(item.r),
     data: months.map((mm) => cellVal(item.r, mm)),
     borderColor: accentColors[(i + 1) % accentColors.length],
     backgroundColor: type === "bar"
@@ -457,7 +498,11 @@ function renderChart() {
         legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
         title: {
           display: true,
-          text: METRICS.find((x) => x.key === state.metric).label + " по месяцам",
+          text: (() => {
+            const label = METRICS.find((x) => x.key === state.metric).label;
+            const unit = METRIC_UNIT[state.metric];
+            return unit ? `${label} ${unit}` : `${label} по месяцам`;
+          })(),
           color: "#1c2430",
         },
       },
