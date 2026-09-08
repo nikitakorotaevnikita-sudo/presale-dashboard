@@ -1,3 +1,4 @@
+import os
 import tempfile
 import zipfile
 from contextlib import closing
@@ -208,6 +209,11 @@ def chat_suggestions():
 def chat(body: ChatBody):
     events, upload, cfg = _load_events_or_400()
 
+    if os.environ.get("LLM_FAKE") == "1":
+        def gen_fake():
+            yield "Тестовый ответ: узкое место — команда Slow (ср. длительность высокая)."
+        return StreamingResponse(gen_fake(), media_type="text/plain; charset=utf-8")
+
     def gen():
         try:
             yield from chat_service.stream_answer(cfg, events, body.messages, upload)
@@ -220,6 +226,11 @@ def chat(body: ChatBody):
 @app.post("/api/analyze")
 def analyze():
     events, upload, cfg = _load_events_or_400()
+
+    if os.environ.get("LLM_FAKE") == "1":
+        def gen_fake():
+            yield "Тестовый ответ: узкое место — команда Slow (ср. длительность высокая)."
+        return StreamingResponse(gen_fake(), media_type="text/plain; charset=utf-8")
 
     def gen():
         try:
