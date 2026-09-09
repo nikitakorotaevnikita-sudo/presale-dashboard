@@ -28,9 +28,10 @@ SUGGESTIONS = [
 
 def build_messages(events, history, upload=None):
     brief = analytics_brief.build_brief(events, upload)
+    # правила и блок ДАННЫЕ — одним system-сообщением: провайдер (Qwen/vLLM)
+    # допускает только одно system-сообщение в начале диалога.
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "system", "content": brief},
+        {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + brief},
     ]
     messages.extend(history or [])
     return messages

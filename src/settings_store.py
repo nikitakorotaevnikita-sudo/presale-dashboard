@@ -4,7 +4,7 @@ _KEYS = ("provider", "base_url", "model", "token")
 _DEFAULTS = {
     "provider": "local",
     "base_url": "https://llm.ario.directum360.ru/v1",
-    "model": "Qwen/Qwen3-8-27B",  # уточнить точное имя через {base_url}/models
+    "model": "Qwen/Qwen3.8-27B",  # точное имя модели у провайдера (подтверждено через {base_url}/models)
     "token": os.environ.get("LLM_TOKEN", ""),
 }
 
