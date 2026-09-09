@@ -703,6 +703,68 @@ async function initAi() {
   } catch (_) {}
 }
 
+// ---- Markdown (безопасный: сначала экранируем HTML, потом форматируем) ----
+function mdInline(s) {
+  // s уже экранирован (& < > заменены)
+  s = s.replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`);
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+    (_, t, u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>`);
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  return s;
+}
+
+function renderMarkdown(src) {
+  const lines = escapeHtml(src == null ? "" : src).split(/\r?\n/);
+  const sep = (l) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(l);
+  const isBlock = (l) => /^```|^#{1,6}\s|^>\s?|^\s*[-*•]\s+|^\s*\d+[.)]\s+/.test(l);
+  const row = (l) => l.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
+  let html = "", i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^```/.test(line)) {
+      const buf = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; }
+      i++;
+      html += `<pre><code>${buf.join("\n")}</code></pre>`; continue;
+    }
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { const lv = Math.min(6, h[1].length); html += `<h${lv}>${mdInline(h[2])}</h${lv}>`; i++; continue; }
+    if (line.includes("|") && i + 1 < lines.length && sep(lines[i + 1])) {
+      const head = row(line); i += 2; const rows = [];
+      while (i < lines.length && lines[i].includes("|") && lines[i].trim() !== "") { rows.push(row(lines[i])); i++; }
+      html += "<table class='md-table'><thead><tr>" +
+        head.map((c) => `<th>${mdInline(c)}</th>`).join("") + "</tr></thead><tbody>" +
+        rows.map((r) => "<tr>" + r.map((c) => `<td>${mdInline(c)}</td>`).join("") + "</tr>").join("") +
+        "</tbody></table>"; continue;
+    }
+    if (/^>\s?/.test(line)) {
+      const buf = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) { buf.push(lines[i].replace(/^>\s?/, "")); i++; }
+      html += `<blockquote>${mdInline(buf.join(" "))}</blockquote>`; continue;
+    }
+    if (/^\s*[-*•]\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\s*[-*•]\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*[-*•]\s+/, "")); i++; }
+      html += "<ul>" + items.map((it) => `<li>${mdInline(it)}</li>`).join("") + "</ul>"; continue;
+    }
+    if (/^\s*\d+[.)]\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*\d+[.)]\s+/, "")); i++; }
+      html += "<ol>" + items.map((it) => `<li>${mdInline(it)}</li>`).join("") + "</ol>"; continue;
+    }
+    if (line.trim() === "") { i++; continue; }
+    const buf = [];
+    while (i < lines.length && lines[i].trim() !== "" && !isBlock(lines[i]) &&
+           !(lines[i].includes("|") && i + 1 < lines.length && sep(lines[i + 1]))) {
+      buf.push(lines[i]); i++;
+    }
+    html += `<p>${mdInline(buf.join("<br>"))}</p>`;
+  }
+  return html;
+}
+
 function appendBubble(role, text) {
   const log = document.getElementById("chat-log");
   const d = document.createElement("div");
@@ -730,7 +792,13 @@ async function streamInto(url, body, bubble) {
     const { value, done } = await reader.read();
     if (done) break;
     acc += dec.decode(value, { stream: true });
-    bubble.textContent = acc;
+    bubble.textContent = acc;  // во время стрима — plain text (плавный вывод)
+    document.getElementById("chat-log").scrollTop = 1e9;
+  }
+  // по завершении — рендерим Markdown (пузырь ассистента)
+  if (acc) {
+    bubble.classList.add("md");
+    bubble.innerHTML = renderMarkdown(acc);
     document.getElementById("chat-log").scrollTop = 1e9;
   }
   return acc;
