@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from openpyxl.utils.exceptions import InvalidFileException
 from pydantic import BaseModel, field_validator
 
-from src import config, storage, metrics, export, settings_store, chat_service, llm_service
+from src import config, storage, metrics, export, settings_store, chat_service, llm_service, code_agent
 from src.parsing import parse_workbook, ParseError
 
 app = FastAPI(title="Дашборд пресейла ОГВ")
@@ -253,6 +253,22 @@ def analyze():
     def gen():
         try:
             yield from chat_service.stream_analysis(cfg, events, upload)
+        except llm_service.LLMError as exc:
+            yield f"\n\n[Ошибка модели: {exc}. Проверьте настройки в Бэкофисе.]"
+
+    return StreamingResponse(gen(), media_type="text/plain; charset=utf-8")
+
+
+@app.post("/api/agent")
+def agent(body: ChatBody):
+    events, upload, cfg = _load_events_or_400()
+
+    if os.environ.get("LLM_FAKE") == "1":
+        return _fake_stream_response()
+
+    def gen():
+        try:
+            yield from code_agent.stream_agent(cfg, events, body.messages, upload)
         except llm_service.LLMError as exc:
             yield f"\n\n[Ошибка модели: {exc}. Проверьте настройки в Бэкофисе.]"
 
