@@ -6,6 +6,19 @@ import tempfile
 from dataclasses import asdict
 from pathlib import Path
 
+# ВАЖНО (остаточный риск): ограничение через exec() с урезанным __builtins__ —
+# это НЕ полноценная граница безопасности (классический obj.__class__.__bases__...
+# ...__subclasses__() gadget-chain теоретически достаёт до модулей, доступных
+# в процессе интерпретатора). Ниже — статический денай-лист опасных токенов
+# как дешёвая дополнительная защита, плюс запуск в отдельном subprocess без
+# секретов в окружении. Для внутреннего доверенного инструмента этого
+# достаточно; полная изоляция (Docker/gVisor и т.п.) — future hardening.
+_FORBIDDEN = (
+    "__subclasses__", "__bases__", "__mro__", "__globals__", "__builtins__",
+    "__class__", "__import__", "__loader__", "__spec__",
+    "importlib", "subprocess", "ctypes",
+)
+
 # Скрипт-обёртка (доверенный): грузит данные, строит df, урезает окружение и
 # исполняет пользовательский код из user_code.py с белым списком импортов.
 _RUNNER = r'''
@@ -40,7 +53,7 @@ except Exception:
 _names = ("abs", "min", "max", "sum", "len", "range", "round", "sorted",
           "enumerate", "zip", "map", "filter", "list", "dict", "set", "tuple",
           "str", "int", "float", "bool", "print", "any", "all", "reversed",
-          "isinstance", "hasattr", "getattr", "repr")
+          "isinstance", "repr")
 _sb = {n: getattr(builtins, n) for n in _names if hasattr(builtins, n)}
 _sb["__import__"] = _safe_import
 _sb["True"], _sb["False"], _sb["None"] = True, False, None
@@ -62,6 +75,10 @@ sys.stdout.write(json.dumps(
 
 
 def run_code(code, events, timeout=15):
+    for token in _FORBIDDEN:
+        if token in code:
+            return {"ok": False, "result": None, "explanation": "",
+                    "error": "Обнаружена запрещённая конструкция: " + token}
     rows = [asdict(e) for e in events]
     child_env = {k: v for k, v in os.environ.items()
                  if k not in ("LLM_TOKEN", "PRESALE_DB")}

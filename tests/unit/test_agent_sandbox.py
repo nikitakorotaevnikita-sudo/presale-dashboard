@@ -49,6 +49,13 @@ def test_non_serializable_result_coerced():
     assert isinstance(r["result"], str)
 
 
+def test_blocks_dunder_gadget():
+    code = "result = ().__class__.__bases__[0].__subclasses__()"
+    r = agent_sandbox.run_code(code, EVENTS)
+    assert r["ok"] is False
+    assert "запрещ" in (r["error"] or "").lower()
+
+
 def test_secrets_not_in_subprocess(monkeypatch):
     monkeypatch.setenv("LLM_TOKEN", "SECRET-TOKEN-XYZ")
     r = agent_sandbox.run_code(
