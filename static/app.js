@@ -727,7 +727,7 @@ function renderMarkdown(src) {
       const buf = []; i++;
       while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; }
       i++;
-      html += `<pre><code>${buf.join("\n")}</code></pre>`; continue;
+      html += `<details class="md-code"><summary>Код</summary><pre><code>${buf.join("\n")}</code></pre></details>`; continue;
     }
     const h = line.match(/^(#{1,6})\s+(.*)$/);
     if (h) { const lv = Math.min(6, h[1].length); html += `<h${lv}>${mdInline(h[2])}</h${lv}>`; i++; continue; }
@@ -817,7 +817,8 @@ async function sendChat(text) {
     chatHistory.push({ role: "user", content: q });
     const bubble = appendBubble("assistant", "…");
     try {
-      const answer = await streamInto("/api/chat", { messages: chatHistory }, bubble);
+      const useAgent = document.getElementById("agent-mode") && document.getElementById("agent-mode").checked;
+      const answer = await streamInto(useAgent ? "/api/agent" : "/api/chat", { messages: chatHistory }, bubble);
       if (answer) chatHistory.push({ role: "assistant", content: answer });
     } catch (e) {
       bubble.textContent = "Сетевая ошибка: " + e.message;

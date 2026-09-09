@@ -198,6 +198,8 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13
 
 /* ============================== AI CHAT ================================= */
 .ai-card { display: flex; flex-direction: column; }
+.agent-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-bottom: 12px; cursor: pointer; }
+.agent-toggle input { accent-color: var(--accent); }
 #chat-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .suggestion {
   font-size: 12.5px; padding: 6px 12px;
@@ -235,6 +237,9 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13
 .bubble.md .md-table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 8px 0; font-size: 12.5px; }
 .bubble.md .md-table th, .bubble.md .md-table td { border-bottom: 1px solid var(--border); padding: 6px 9px; text-align: left; }
 .bubble.md .md-table th { background: var(--surface-2); color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
+.bubble.md .md-code { margin: 8px 0; }
+.bubble.md .md-code > summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--accent); }
+.bubble.md .md-code pre { margin: 8px 0 0; }
 #chat-form { display: flex; gap: 10px; margin-top: 14px; }
 #chat-input {
   flex: 1; padding: 10px 12px; min-height: 40px;
