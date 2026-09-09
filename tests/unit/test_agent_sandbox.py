@@ -56,6 +56,20 @@ def test_blocks_dunder_gadget():
     assert "запрещ" in (r["error"] or "").lower()
 
 
+def test_blocks_file_write(tmp_path):
+    target = tmp_path / "leak.csv"
+    code = f"df.to_csv(r'{target}')\nresult = 'wrote'"
+    r = agent_sandbox.run_code(code, EVENTS)
+    assert r["ok"] is False  # запись в ФС через pandas заблокирована
+    assert not target.exists()
+
+
+def test_result_survives_user_print():
+    code = "print('шум', end='')\nresult = 42"
+    r = agent_sandbox.run_code(code, EVENTS)
+    assert r["ok"] is True and r["result"] == 42
+
+
 def test_secrets_not_in_subprocess(monkeypatch):
     monkeypatch.setenv("LLM_TOKEN", "SECRET-TOKEN-XYZ")
     r = agent_sandbox.run_code(

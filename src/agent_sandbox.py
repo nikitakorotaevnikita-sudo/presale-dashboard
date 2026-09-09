@@ -11,8 +11,13 @@ from pathlib import Path
 # ...__subclasses__() gadget-chain теоретически достаёт до модулей, доступных
 # в процессе интерпретатора). Ниже — статический денай-лист опасных токенов
 # как дешёвая дополнительная защита, плюс запуск в отдельном subprocess без
-# секретов в окружении. Для внутреннего доверенного инструмента этого
-# достаточно; полная изоляция (Docker/gVisor и т.п.) — future hardening.
+# секретов в окружении. Доступ к файловой системе из пользовательского кода
+# дополнительно заблокирован на уровне раннера: builtins.open, io.open и
+# pandas.io.common.get_handle подменены на функцию, бросающую OSError, —
+# это перекрывает df.to_csv/pd.read_csv/np.save и т.п., которые иначе
+# используют собственный open pandas/numpy в обход урезанного namespace.
+# Для внутреннего доверенного инструмента этого достаточно; полная изоляция
+# (Docker/gVisor и т.п.) — future hardening.
 _FORBIDDEN = (
     "__subclasses__", "__bases__", "__mro__", "__globals__", "__builtins__",
     "__class__", "__import__", "__loader__", "__spec__",
@@ -61,6 +66,17 @@ _sb["True"], _sb["False"], _sb["None"] = True, False, None
 with open("user_code.py", encoding="utf-8") as f:
     _code = f.read()
 
+import io as _io
+def _no_fs(*_a, **_k):
+    raise OSError("Доступ к файловой системе запрещён в песочнице")
+builtins.open = _no_fs
+_io.open = _no_fs
+try:
+    import pandas.io.common as _pcommon
+    _pcommon.get_handle = _no_fs
+except Exception:
+    pass
+
 _ns = {"__builtins__": _sb, "df": _df.copy(), "pd": pd, "result": None, "explanation": ""}
 try:
     exec(_code, _ns)
@@ -68,7 +84,7 @@ except Exception:
     sys.stderr.write(traceback.format_exc())
     sys.exit(1)
 
-sys.stdout.write(json.dumps(
+sys.stdout.write("\n" + json.dumps(
     {"result": _ns.get("result"), "explanation": str(_ns.get("explanation") or "")},
     ensure_ascii=False, default=str))
 '''
