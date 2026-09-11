@@ -11,6 +11,8 @@
 ## Стек
 
 - **Python 3.10+**, FastAPI, Uvicorn, openpyxl, SQLite
+- **LLM**: OpenAI-совместимый SDK (`openai`) — чат-аналитик и code-agent
+- **Анализ кодом**: `pandas` (песочница code-agent)
 - **Фронтенд**: Vanilla JS + Chart.js (локально, без CDN)
 - **Тесты**: pytest + Playwright
 
@@ -118,15 +120,15 @@ docker run -d -p 8090:8090 -v "$(pwd)/data:/app/data" presale-dashboard
 ## Тесты
 
 ```powershell
-# Быстрые unit-тесты (26 тестов)
+# Unit-тесты (парсинг, метрики, сводка, LLM-сервис, песочница code-agent, API)
 .venv\Scripts\python.exe -m pytest tests/unit/ -q
 
-# E2E-тесты Playwright (4 теста; нужен установленный браузер)
+# E2E-тесты Playwright (дашборд, ИИ-чат, code-agent; нужен установленный браузер)
 playwright install chromium
 .venv\Scripts\python.exe -m pytest tests/e2e/ -v
 ```
 
-Скриншоты E2E сохраняются в `tmp/screenshots/`.
+Скриншоты E2E сохраняются в `tmp/screenshots/`. Реальный LLM в тестах не вызывается (мок / `LLM_FAKE=1`).
 
 ---
 
